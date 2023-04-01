@@ -1,0 +1,918 @@
+using System;
+using System.Diagnostics;
+
+
+namespace HyperElk.Core
+{
+
+    public class ShadowPriest : CombatRoutine
+    {
+        private string VersionNumber = "1.0.0";
+        private int playerLevel => API.PlayerLevel;
+        private bool inRange => API.TargetRange <= 36;
+
+         // Shadow buffs
+        private string VampiricEmbrace = "Vampiric Embrace";
+        private string InnerFire = "Inner Fire";
+        private string ShadowForm = "Shadowform";
+        private string ShadowWeaving = "Shadow Weaving";
+		private string PowerWordFortitude = "Power Word Fortitude";
+		private string POPowerWordFortitude = "Prayer of Fortitude";
+		private string DivineSpirit = "Divine Spirit";
+		private string PODivineSpirit = "Prayer of Divine Spirit";
+		private string ShadowProt = "Shadow Protection";
+		private string POShadowProt = "Prayer of Shadow Protection";
+		private string FlareOfTheHeavens = "Flare of the Heavens";
+		private string DyingCurse = "Dying Curse";
+		private string Starlight = "Starlight";
+		
+        //Shadowspells
+        private string ShadowWordPain = "Shadow Word: Pain";
+        private string VampiricTouch = "Vampiric Touch";
+        private string DevouringPlague = "Devouring Plague";
+        private string MindFlay = "Mind Flay";
+        private string MindBlast = "Mind Blast";
+        private string ShadowWordDeath = "Shadow Word: Death";
+		private string Shadowfiend = "Shadowfiend";
+		private string Trinket1 = "Trinket1";
+        private string Trinket2 = "Trinket2";
+		private string Stoppy = "Stopcast";
+		private string Gloves = "Engineering Gloves";
+		private string MO = "Mouseover";
+		private string MindSear = "Mind Sear";
+		private string Dispersion = "Dispersion";
+		private string Fade = "Fade";
+		private string InnerFocus = "Inner Focus";
+		private string EatingBuff = "Food Buff";
+        private string MageEatingBuff = "Mage Food Buff";
+		private string Shoot = "Shoot";
+		private string BigBang = "Big Bang";
+		
+		
+		//Argent Vehicles
+		private string Thrust = "Thrust";
+		private string ShieldBreaker = "Shield Breaker";
+		private string Charge = "Charge";
+        private string Defend = "Defend";
+		
+		private string ThrustMacro = "Thrust";
+		private string ShieldBreakerMacro = "Shield Breaker";
+		private string ChargeMacro = "Charge";
+        private string DefendMacro = "Defend";
+		
+
+
+        // Debuff
+        private string ShadowMastery = "Shadow Mastery";
+        //Toggle
+        private string DPMove = "DPMove";
+        private string Vezax = "Vezax";
+		private string MOToggle = "MO";
+		private string Sear = "OnlySear";
+		// private string GloveOnCD = "GloveCD";
+		// private string NoDP = "DP OFF";
+		private string NoMB = "MB/D OFF";
+		private string Hodir = "Hodir";
+		private string Argent = "ArgentVehicles";
+		
+        //Boss Specific
+        private string ShadowCrash = "Shadow Crash";
+
+        private int WorldPing = 15;
+		
+		// private int PingSet => API.numbPercentListLong[CombatRoutine.GetPropertyInt(Ping)];
+
+
+
+
+       
+
+
+
+
+
+
+        int[] InterruptList =
+        {
+        // Heal \\
+
+        // Fear \\
+
+        // Summon \\
+
+        // All Spells Harmful \\
+
+        };
+
+
+
+         // Interrupt Settings
+        private string InterruptUse = "Spells to interrupt";
+        string[] InterrupptSpells = { "Whitelist", "All" };
+        private string InterruptSpell => InterrupptSpells[GetPropertyInt(InterruptUse)];
+		
+		// private string InterruptUse = "Spells to interrupt";
+        // string[] TargetUnitList = { "target", "focus", "mouseover", "boss1", "boss2", "boss3" };
+        // private string InterruptSpell => InterrupptSpells[GetPropertyInt(InterruptUse)];
+		
+		// int[] FlayNPCIDList = { 33168, 31146 };
+		
+		// int[] FlayNPCIDList = { 
+		// 33168, //Freya Roots
+		// 31146  //Target Dummy
+		// };
+		
+		private bool GlovesReady => API.Classic_GloveEnchantAvail;
+		private bool hasDots => API.TargetHasDebuff(DevouringPlague) && API.TargetHasDebuff(VampiricTouch) && API.TargetHasDebuff(ShadowWordPain);
+		private bool isSearing => API.CurrentCastSpellID("player") == 53023;
+		private bool isFlaying => API.CurrentCastSpellID("player") == 48156;
+		private bool isBoss => API.TargetIsBoss;
+		
+		private bool ChargeRange => API.TargetRange >= 6 && API.TargetRange <= 25;
+		private bool ThrustRange => API.TargetRange <= 5;
+		private bool TripleDefendBuff => API.PlayerBuffStacks(Defend) > 2;
+		 
+		
+		
+		private bool isBigBang => (API.CurrentCastSpellID("focus") == 64443 || API.CurrentCastSpellID("boss1") == 64443 || API.CurrentCastSpellID("target") == 64443 || API.CurrentCastSpellID("mouseover") == 64443) && (API.UnitCurrentCastTimeRemaining("boss1") <= 300 || API.FocusCurrentCastTimeRemaining <= 300 || API.TargetCurrentCastTimeRemaining <= 300 || API.MouseoverCurrentCastTimeRemaining <= 300);
+		
+		// private bool DisperseBigBangNow => API.PlayerCurrentCastTimeRemaining <= 30
+		
+		// private bool OnlyFlayGuidList => FlayNPCIDList.Contains(API.TargetGUIDNPCID);
+		private bool OnlyFlayGuidList => API.TargetGUIDNPCID == 33168 || API.TargetGUIDNPCID == 34057 || API.TargetGUIDNPCID == 32955;
+		
+		
+		private bool LastShadowCast => (API.PlayerLastSpell != VampiricTouch || API.PlayerLastSpell != MindBlast);
+		// private bool QueueNow => API.PlayerCurrentCastTimeRemaining < 27;
+		private bool IsNotEating => (!API.PlayerHasBuff(MageEatingBuff) || !API.PlayerHasBuff(EatingBuff));
+
+
+
+        public override void Initialize()
+        {
+            CombatRoutine.isWOLTKRotation();
+            CombatRoutine.Name = "Shadow Priest " + VersionNumber + " by Lost. \n";
+            API.WriteLog("\n******************************************************* \n" +
+                "Spriest PvE is loaded.\n" +
+                "*******************************************************");
+            CombatRoutine.isAutoBindReady = true;
+            //Shadow buffs
+            AddBuff(VampiricEmbrace, 15286);
+            AddBuff(InnerFire, 48168);
+            AddBuff(ShadowForm, 15473);
+            AddBuff(ShadowWeaving, 15258);
+            AddSpell(VampiricEmbrace, 15286);
+            AddSpell(InnerFire, 48168);
+            AddSpell(ShadowForm, 15473);
+            AddBuff(ShadowCrash, 63277);
+			AddBuff(ShadowProt, 48169);
+			AddBuff(POShadowProt, 48170);
+			AddBuff(DivineSpirit, 48073);
+			AddBuff(PODivineSpirit, 48074);
+			AddBuff(PowerWordFortitude, 48161);
+			AddBuff(POPowerWordFortitude, 48162);
+			AddBuff(Dispersion, 48585);
+			AddBuff(Fade, 586);
+			AddBuff(InnerFocus, 14751);
+			AddBuff(FlareOfTheHeavens, 64713);
+			AddDebuff(ShadowCrash, 63277);
+			AddBuff(EatingBuff, 43183);
+            AddBuff(MageEatingBuff, 57073);
+			AddBuff(DyingCurse, 60494);
+			AddBuff(Starlight, 62807);
+
+            //Shadow Spells
+            AddSpell(ShadowWordPain, 48125);
+            AddDebuff(ShadowWordPain, 48125);
+            AddSpell(VampiricTouch, 48160);
+            AddDebuff(VampiricTouch, 48160);
+            AddSpell(DevouringPlague, 48300);
+            AddDebuff(DevouringPlague, 48300);
+            AddSpell(MindFlay, 48156);
+            AddSpell(MindBlast, 48127);
+            AddSpell(ShadowWordDeath, 48158);
+			AddSpell(Shadowfiend, 34433);
+			AddSpell(ShadowProt, 48169, "D1");
+			AddSpell(POShadowProt, 48170, "D1");
+			AddSpell(DivineSpirit, 48073, "D1");
+			AddSpell(PODivineSpirit, 48074, "D1");
+			AddSpell(PowerWordFortitude, 48161, "D1");
+			AddSpell(POPowerWordFortitude, 48162, "D1");
+			AddSpell(MindSear, 53023, "D1");
+			AddSpell(Dispersion, 48585, "D1");
+			AddSpell(Fade, 586, "D1");
+			AddSpell(InnerFocus, 14751, "D1");
+			AddSpell(BigBang, 64443);
+			AddSpell(Shoot);
+			
+			//Argent Vehicles
+			AddSpell(Thrust, 62544, "D1");
+			AddSpell(ShieldBreaker, 62575, "D1");
+			AddSpell(Charge, 62960, "D1");
+			AddSpell(Defend, 62552, "D1");
+			AddBuff(Defend, 62552);
+			
+
+            //Debuffs
+            AddDebuff(ShadowMastery, 17800);
+
+            //Toggle
+            AddToggle(DPMove);
+            AddToggle(Vezax);
+			AddToggle(MOToggle);
+			AddToggle(Sear);
+			// AddToggle(GloveOnCD);
+			// AddToggle(NoDP);
+			AddToggle(NoMB);
+			AddToggle(Hodir);
+			AddToggle(Argent);
+			
+
+
+			CombatRoutine.AddMacro("Stopcast", "D1", "None", "None", @"/stopcasting");
+			CombatRoutine.AddMacro("Trinket1", "D1", "None", "None", @"/use 13");
+			CombatRoutine.AddMacro("Trinket2", "D1", "None", "None", @"/use 14");
+			CombatRoutine.AddMacro("Gloves", "D1", "None", "None", @"/use 10");
+			CombatRoutine.AddMacro(ShadowWordPain + MO, "D1", "None", "None", @"/cast [@mouseover, harm, nodead] #48125#");
+			CombatRoutine.AddMacro(VampiricTouch + MO, "D1", "None", "None", @"/cast [@mouseover, harm, nodead] #48160#");
+
+			// CombatRoutine.AddProp(Ping, Ping + "World Ping", API.numbPercentListLong, "World Ping" + Ping + " Set to ingame ping", "Clipping", 25);
+			
+			// CombatRoutine.AddProp("Ping", 25, "Set to world ping", "Mind Flay Clipping");
+
+			CombatRoutine.AddMacro("ThrustMacro", "D1", "None", "None", @"/cast Thrust");
+			CombatRoutine.AddMacro("ShieldBreakerMacro", "D1", "None", "None", @"/cast Shield Breaker");
+			CombatRoutine.AddMacro("ChargeMacro", "D1", "None", "None", @"/cast Charge");
+			CombatRoutine.AddMacro("DefendMacro", "D1", "None", "None", @"/cast Defend");
+			
+            // Settings
+            AddProp(InterruptUse, InterruptUse, InterrupptSpells, "Player Interrupt Spells", "Interrupt", 0);
+            //FINISHME
+
+        }
+
+        // Defense
+        private bool DefenseRotation()
+        {
+            return false;
+        }
+
+        #region INTERUPTS
+        private bool Interupt(int TargetCurrentSpellID)
+        {
+            //FINISHME
+            return false;
+        }
+        #endregion
+
+        private bool SingleRotation()
+        {
+
+
+
+            return false;
+        }
+
+        private bool AOERotation()
+
+        {
+			
+			
+			return false;
+            
+        }
+
+        public override void CombatPulse()
+		
+		
+        
+		{
+			// if (API.ToggleIsEnabled(Argent))
+            // {
+                // CastBestSpellArgent();
+                // return;
+            // }
+			
+			if (API.CanCast(Dispersion) && isBigBang)
+            {
+                API.CastSpell(Dispersion);
+				API.CastSpell(Stoppy);
+                return;
+            }
+
+			if(API.ToggleIsEnabled(Vezax))
+            {
+                CastBestSpellVezax();
+                return;
+            }
+			if(API.ToggleIsEnabled(Hodir))
+            {
+                CastBestSpellHodir();
+                return;
+            }
+			if(OnlyFlayGuidList)
+            {
+                CastOnlyFlayNPCList();
+                return;
+            }
+			
+			double MindFlayCastTimeSec = (3 / (1f + API.PlayerGetHaste));
+            int MindFlayCastTime = (int)(MindFlayCastTimeSec * 100);
+            int MindFlayTickTime = MindFlayCastTime / 3;
+
+
+            if (API.PlayerIsChanneling && API.PlayerCurrentCastTimeRemaining >= MindFlayTickTime - WorldPing)
+            {
+                if (API.PlayerCurrentCastTimeRemaining <= (MindFlayTickTime + WorldPing) && API.PlayerCurrentCastTimeRemaining >= (MindFlayTickTime - WorldPing))
+                {
+                    CastBestSpellNoMF();
+                    return;
+                }
+                return;
+            }
+
+			
+            if ((API.PlayerCurrentCastTimeRemaining <= 30 && API.PlayerCurrentCastSpellID != 48156) || (API.PlayerCurrentCastSpellID == 48156 && API.PlayerCurrentCastTimeRemaining <= WorldPing))
+            {
+                CastBestSpell();
+                return;
+            }
+
+
+
+            return;
+
+        }
+		
+		
+		
+			// public void CastBestSpellArgent()
+        // {
+            // if (API.PlayerIsMounted)
+            // {
+                
+                // if (API.CanCast(Defend) && TripleDefendBuff)
+                // {
+                    // API.CastSpell(DefendMacro);
+                    // return;
+                // }
+                // if (API.CanCast(Thrust) && ThrustRange)
+                // {
+                    // API.CastSpell(ThrustMacro);
+                    // return;
+                // }
+				// if (API.CanCast(ShieldBreaker) && API.TargetHasBuff(Defend) && ChargeRange)
+                // {
+                    // API.CastSpell(ShieldBreakerMacro);
+                    // return;
+                // }
+				// if (API.CanCast(Charge) && !API.TargetHasBuff(Defend) && ChargeRange)
+                // {
+                    // API.CastSpell(ChargeMacro);
+                    // return;
+                // }
+				
+				
+                
+        // }
+		
+		
+		
+		// if (TripleDefendBuff)
+                // {
+                    // API.CastSpell(DefendMacro);
+                    // return;
+                // }
+                // if (ThrustRange)
+                // {
+                    // API.CastSpell(ThrustMacro);
+                    // return;
+                // }
+				// if (API.TargetHasBuff(Defend) && ChargeRange)
+                // {
+                    // API.CastSpell(ShieldBreakerMacro);
+                    // return;
+                // }
+				// if (!API.TargetHasBuff(Defend) && ChargeRange)
+                // {
+                    // API.CastSpell(ChargeMacro);
+                    // return;
+                // }
+		
+		public void CastOnlyFlayNPCList()
+        {
+            if (OnlyFlayGuidList)
+            {
+                
+                double MindFlayCastTimeSec = (3 / (1f + API.PlayerGetHaste));
+                int MindFlayCastTime = (int)(MindFlayCastTimeSec * 100);
+                int MindFlayTickTime = MindFlayCastTime / 3;
+
+                // if (API.CanCast(MindBlast) && !API.PlayerIsCasting(true))
+                // {
+                    // API.CastSpell(MindBlast);
+                    // return;
+                // }
+                if (API.CanCast(MindFlay) && !API.PlayerIsCasting(true))
+                {
+                    API.CastSpell(MindFlay);
+                    return;
+                }
+                if (API.CanCast(MindFlay) && API.PlayerIsCasting(true) && API.PlayerCurrentCastSpellID != 48156)
+                {
+                    API.CastSpell(MindFlay);
+                    return;
+                }
+            }
+            else
+            {
+                return;
+
+            }
+        }
+		
+		// public void HandleDevouringPlague()
+        // {
+							
+				// bool hasRefreshedDuringBloodlust = false;
+				// DateTime lastDevouringPlagueCast = DateTime.MinValue;
+
+				...
+
+				// bool hasBloodlust = API.PlayerHasBuff("Bloodlust");
+				// DateTime currentTime = DateTime.UtcNow;
+				// TimeSpan timeSinceLastCast = currentTime - lastDevouringPlagueCast;
+
+				// if (API.CanCast(DevouringPlague) &&
+					// (!API.TargetHasDebuff(DevouringPlague) ||
+					 // (hasBloodlust && (!hasRefreshedDuringBloodlust || timeSinceLastCast.TotalSeconds >= 24))))
+				// {
+					// API.CastSpell(DevouringPlague);
+					// lastDevouringPlagueCast = currentTime;
+					// hasRefreshedDuringBloodlust = hasBloodlust;
+				// }
+
+				// if (!hasBloodlust)
+				// {
+					// hasRefreshedDuringBloodlust = false;
+				// }
+
+		
+		
+        public void CastBestSpellVezax()
+        {
+            if (API.PlayerHasDebuff(ShadowCrash))
+            {
+				if (API.CanCast(Fade) && API.PlayerIsMoving)
+														{
+															API.CastSpell(Fade);
+															return;
+														}	
+                if (!API.TargetHasDebuff(ShadowWordPain) && API.CanCast(ShadowWordPain) && API.PlayerBuffStacks(ShadowWeaving) == 5)
+                {
+                    API.CastSpell(ShadowWordPain);
+                    return;
+                }
+
+                double MindFlayCastTimeSec = (3 / (1f + API.PlayerGetHaste));
+                int MindFlayCastTime = (int)(MindFlayCastTimeSec * 100);
+                int MindFlayTickTime = MindFlayCastTime / 3;
+
+                double VTCastTimeSec = (1.5 / (1f + API.PlayerGetHaste));
+                int VTCastTime = (int)(VTCastTimeSec * 100);
+                if (API.TargetDebuffRemainingTime(VampiricTouch) < VTCastTime || !API.TargetHasDebuff(VampiricTouch))
+                {
+                    if (API.CanCast(VampiricTouch) && API.PlayerIsChanneling)
+                    {
+                        API.CastSpell(VampiricTouch);
+                        return;
+                    }
+                    if (API.CanCast(VampiricTouch) && API.PlayerCurrentCastSpellID != 48160 && API.LastSpellCastInGame != VampiricTouch)
+                    {
+                        API.CastSpell(VampiricTouch);
+                        return;
+                    }
+                }
+                if (API.TargetDebuffRemainingTime(DevouringPlague) == 0 && API.CanCast(DevouringPlague))
+                {
+                    API.CastSpell(DevouringPlague);
+                    return;
+                }
+                if (API.CanCast(MindFlay) && !API.PlayerIsCasting(true))
+                {
+                    API.CastSpell(MindFlay);
+                    return;
+                }
+                if (API.CanCast(MindFlay) && API.PlayerIsCasting(true) && API.PlayerCurrentCastSpellID != 48156)
+                {
+                    API.CastSpell(MindFlay);
+                    return;
+                }
+            }
+            else
+            {
+				if (!API.PlayerIsAutoAttack && API.PlayerIsInCombat  && API.CanCast(Shoot) && !API.PlayerIsMoving && !API.PlayerHasDebuff(ShadowCrash))
+                {
+                    API.CastSpell(Shoot);
+                    return;
+                }
+                return;
+
+            }
+        }
+		
+		public void CastBestSpellHodir()
+        {
+            if (API.PlayerHasBuff(Starlight))
+            {
+                if (!API.TargetHasDebuff(ShadowWordPain) && API.CanCast(ShadowWordPain) && API.PlayerBuffStacks(ShadowWeaving) == 5)
+                {
+                    API.CastSpell(ShadowWordPain);
+                    return;
+                }
+
+                double MindFlayCastTimeSec = (3 / (1f + API.PlayerGetHaste));
+                int MindFlayCastTime = (int)(MindFlayCastTimeSec * 100);
+                int MindFlayTickTime = MindFlayCastTime / 3;
+
+                
+                    
+                if (API.CanCast(MindFlay) && !API.PlayerIsCasting(true))
+                {
+                    API.CastSpell(MindFlay);
+                    return;
+                }
+                if (API.CanCast(MindFlay) && API.PlayerIsCasting(true) && API.PlayerCurrentCastSpellID != 48156)
+                {
+                    API.CastSpell(MindFlay);
+                    return;
+                }
+            }
+            else
+            {
+						double MindFlayCastTimeSec = (3 / (1f + API.PlayerGetHaste));
+						int MindFlayCastTime = (int)(MindFlayCastTimeSec * 100);
+						int MindFlayTickTime = MindFlayCastTime / 3;
+
+
+						if (API.PlayerIsChanneling && API.PlayerCurrentCastTimeRemaining >= MindFlayTickTime - WorldPing)
+						{
+							if (API.PlayerCurrentCastTimeRemaining <= (MindFlayTickTime + WorldPing) && API.PlayerCurrentCastTimeRemaining >= (MindFlayTickTime - WorldPing))
+							{
+								CastBestSpellNoMF();
+								return;
+							}
+							return;
+						}
+
+						
+						if ((API.PlayerCurrentCastTimeRemaining <= 30 && API.PlayerCurrentCastSpellID != 48156) || (API.PlayerCurrentCastSpellID == 48156 && API.PlayerCurrentCastTimeRemaining <= WorldPing))
+						{
+							CastBestSpell();
+							return;
+						}
+                // return;
+
+            }
+        }
+		
+		
+        public void CastBestSpellNoMF()
+        {
+			if (!API.ToggleIsEnabled(Sear) && !API.PlayerHasBuff(InnerFocus))
+				{
+            if (API.PlayerIsMoving && API.CanCast(ShadowWordDeath))
+            {
+                API.CastSpell(ShadowWordDeath);
+                return;
+            }
+
+            if (API.PlayerIsMoving && API.ToggleIsEnabled(DPMove) && API.CanCast(DevouringPlague))
+            {
+                API.CastSpell(DevouringPlague);
+                return;
+            }
+
+            if (!API.TargetHasDebuff(ShadowWordPain) && API.CanCast(ShadowWordPain) && API.PlayerBuffStacks(ShadowWeaving) == 5)
+            {
+                API.CastSpell(ShadowWordPain);
+                return;
+            }
+
+            double MindFlayCastTimeSec = (3 / (1f + API.PlayerGetHaste));
+            int MindFlayCastTime = (int)(MindFlayCastTimeSec * 100);
+            int MindFlayTickTime = MindFlayCastTime / 3;
+
+            double VTCastTimeSec = (1.5 / (1f + API.PlayerGetHaste));
+            int VTCastTime = (int)(VTCastTimeSec * 100);
+            if (API.TargetDebuffRemainingTime(VampiricTouch) < VTCastTime || !API.TargetHasDebuff(VampiricTouch))
+            {
+                if (API.CanCast(VampiricTouch) && API.PlayerCurrentCastSpellID != 48160 && API.LastSpellCastInGame != VampiricTouch)
+                {
+                    API.CastSpell(VampiricTouch);
+                    return;
+                }
+            }
+            if (API.TargetDebuffRemainingTime(DevouringPlague) == 0 && API.CanCast(DevouringPlague))
+            {
+                API.CastSpell(DevouringPlague);
+                return;
+            }
+            if (API.CanCast(MindBlast) && API.PlayerCurrentCastSpellID != 48127 && API.LastSpellCastInGame != MindBlast && !API.ToggleIsEnabled(NoMB))
+            {
+                API.CastSpell(MindBlast);
+                return;
+            }
+
+            int GCD = (int)(API.SpellGCDTotalDuration + 20);
+            if (API.CanCast(ShadowWordDeath) && (API.TargetDebuffRemainingTime(DevouringPlague) < GCD))
+            {
+                API.CastSpell(ShadowWordDeath);
+                return;
+            }
+				}
+        }
+
+        public void CastBestSpell()
+        {
+			
+			// if (API.CanCast(Defend) && TripleDefendBuff)
+                // {
+                    // API.CastSpell(DefendMacro);
+                    // return;
+                // }
+                // if (API.CanCast(Thrust) && ThrustRange)
+                // {
+                    // API.CastSpell(ThrustMacro);
+                    // return;
+                // }
+				// if (API.CanCast(ShieldBreaker) && API.TargetHasBuff(Defend) && ChargeRange)
+                // {
+                    // API.CastSpell(ShieldBreakerMacro);
+                    // return;
+                // }
+				// if (API.CanCast(Charge) && !API.TargetHasBuff(Defend) && ChargeRange)
+                // {
+                    // API.CastSpell(ChargeMacro);
+                    // return;
+                // }
+			if (API.CanCast(Dispersion) && API.PlayerHealthPercent <= 10 && !API.PlayerHasBuff(Dispersion))
+														{
+															API.CastSpell(Dispersion);
+															return;
+														}
+														
+			if (API.CanCast(Fade) && API.PlayerHealthPercent <= 15 && API.PlayerIsMoving)
+														{
+															API.CastSpell(Fade);
+															return;
+														}	
+			if (API.CanCast(MindSear) && API.TargetUnitInRangeCount >= 5 && IsAOE && !API.PlayerIsChanneling)
+            {
+                API.CastSpell(MindSear);
+                return;
+            }
+			// if (API.CurrentCastSpellID("player") == 48156 
+					// && API.SpellCDDuration(MindBlast) > 300
+						// && API.TargetDebuffRemainingTime(VampiricTouch) > 300
+							// && API.TargetDebuffRemainingTime(DevouringPlague) > 300
+								// && (!API.PlayerIsCasting(true) || !API.PlayerIsCasting(false))
+									// && LastShadowCast
+										// && QueueNow)
+										// {
+											// API.CastSpell(MindFlay);
+											// API.WriteLog("Mind Flay Spell Queue MF");
+											// return;
+										// }		
+			
+										
+			if (API.CanCast(MindSear) && API.ToggleIsEnabled(Sear) && !isSearing)
+															{
+																API.CastSpell(MindSear);
+																return;
+															}
+						
+			if (API.CanCast(MindBlast) && !API.PlayerIsInCombat && !API.ToggleIsEnabled(Sear) && !API.ToggleIsEnabled(NoMB))
+										{
+											API.CastSpell(MindBlast);
+											API.WriteLog("Mind Blast Opener");
+											return;
+										}
+            if (API.PlayerIsMoving && API.CanCast(ShadowWordDeath))
+            {
+                API.CastSpell(ShadowWordDeath);
+                return;
+            }
+			if (!API.TargetHasDebuff(ShadowWordPain) && API.CanCast(ShadowWordPain) && API.PlayerBuffStacks(ShadowWeaving) == 5)
+            {
+                API.CastSpell(ShadowWordPain);
+                return;
+            }
+
+            if (API.PlayerIsMoving && API.ToggleIsEnabled(DPMove) && API.CanCast(DevouringPlague))
+            {
+                API.CastSpell(DevouringPlague);
+                return;
+            }
+		
+									
+            
+			
+			//Cooldowns
+												if (API.PlayerTrinketIsUsable(1) 
+													&& API.PlayerTrinketRemainingCD(1) == 0 
+														&& IsCooldowns 
+															&& !API.PlayerIsCasting() 
+																&& !API.PlayerIsChanneling
+																	&& !isFlaying)
+												{
+													API.CastSpell("Trinket1");
+													return;
+												}
+												if (GlovesReady 
+													&& !API.PlayerIsCasting() 
+														&& !API.PlayerIsChanneling 
+															&& IsCooldowns
+																&& !isFlaying)
+												{
+													API.CastSpell("Gloves");
+													return;
+												}
+												if (API.CanCast(Shadowfiend) 
+													&& hasDots 
+														&& !API.PlayerIsCasting() 
+															&& !API.PlayerIsChanneling 
+																&& IsCooldowns
+																	&& !isFlaying)
+												{
+													API.CastSpell(Shadowfiend);
+													return;
+												}	
+												if (API.CanCast(InnerFocus) 
+													&& hasDots 
+														&& !API.PlayerIsCasting() 
+															&& !API.PlayerIsChanneling
+																// && API.SpellCDDuration(MindBlast) > GCD
+																	// && API.TargetDebuffRemainingTime(VampiricTouch) > GCD
+																		// && API.TargetDebuffRemainingTime(DevouringPlague) > GCD
+																			&& IsCooldowns
+																				&& (API.PlayerHasBuff(FlareOfTheHeavens) || API.PlayerHasBuff(DyingCurse))
+																					&& !API.CanCast(Shadowfiend)
+																						&& !isFlaying)
+												{
+													API.CastSpell(InnerFocus);
+													return;
+												}	
+												if (API.PlayerHasBuff(InnerFocus)
+														&& !API.CanCast(InnerFocus) 
+															&& !API.PlayerIsCasting()
+																&& !API.CanCast(Shadowfiend)
+																	&& !isFlaying)
+												{
+													API.CastSpell(MindFlay);
+													API.WriteLog("Mind Flay w/InnerFocus");
+													return;
+												}
+
+            double MindFlayCastTimeSec = (3 / (1f + API.PlayerGetHaste));
+            int MindFlayCastTime = (int)(MindFlayCastTimeSec * 100);
+            int MindFlayTickTime = MindFlayCastTime / 3;
+
+            double VTCastTimeSec = (1.5 / (1f + API.PlayerGetHaste));
+            int VTCastTime = (int)(VTCastTimeSec * 100);
+			if (!API.ToggleIsEnabled(Sear) && !API.PlayerHasBuff(InnerFocus))
+				{
+            if (API.TargetDebuffRemainingTime(VampiricTouch) < VTCastTime || !API.TargetHasDebuff(VampiricTouch))
+            {
+                if (API.CanCast(VampiricTouch) && API.PlayerCurrentCastSpellID != 48160 && API.LastSpellCastInGame != VampiricTouch)
+                {
+                    API.CastSpell(VampiricTouch);
+                    return;
+                }
+            }
+											// Mouseover
+											if (API.CanCast(VampiricTouch) 
+												&& (API.MouseoverDebuffRemainingTime(VampiricTouch) < VTCastTime || !API.MouseoverHasDebuff(VampiricTouch))
+													&& API.PlayerCurrentCastSpellID != 48160 
+														&& API.LastSpellCastInGame != VampiricTouch 
+															&& API.ToggleIsEnabled(MOToggle)
+																&& API.PlayerCanAttackMouseover)
+											{
+												API.CastSpell(VampiricTouch + MO);
+												return;
+											}
+											 if (!API.MouseoverHasDebuff(ShadowWordPain) 
+												 && API.CanCast(ShadowWordPain) 
+													&& API.ToggleIsEnabled(MOToggle) 
+														&& API.PlayerBuffStacks(ShadowWeaving) == 5
+															&& API.PlayerCanAttackMouseover)
+											{
+												API.CastSpell(ShadowWordPain + MO);
+												return;
+											}
+											
+																			//Combat Buffs
+																			if (API.CanCast(InnerFire) && !API.PlayerHasBuff(InnerFire))
+																			{
+																				API.CastSpell(InnerFire);
+																				return;
+																			}
+																			if (API.CanCast(ShadowForm) && !API.PlayerHasBuff(ShadowForm))
+																			{
+																				API.CastSpell(ShadowForm);
+																				return;
+																			}
+											
+											
+            if (API.TargetDebuffRemainingTime(DevouringPlague) == 0 && API.CanCast(DevouringPlague))
+            {
+                API.CastSpell(DevouringPlague);
+                return;
+            }
+            if (API.CanCast(MindBlast) && API.PlayerCurrentCastSpellID != 48127 && API.LastSpellCastInGame != MindBlast && !API.ToggleIsEnabled(NoMB))
+            {
+                API.CastSpell(MindBlast);
+                return;
+            }
+
+            int GCD = (int)(API.SpellGCDTotalDuration + 20);
+            if (API.CanCast(ShadowWordDeath) && (API.TargetDebuffRemainingTime(DevouringPlague) < GCD))
+            {
+                API.CastSpell(ShadowWordDeath);
+                return;
+            }
+			if (API.CanCast(MindSear) && (API.TargetUnitInRangeCount >= 3 && IsAOE))
+            {
+                API.CastSpell(MindSear);
+                return;
+            }
+			if (API.CanCast(MindFlay) && (API.TargetUnitInRangeCount <= 2 && IsAOE))
+            {
+                API.CastSpell(MindFlay);
+                return;
+            }
+			if (API.CanCast(MindFlay) && !IsAOE)
+            {
+                API.CastSpell(MindFlay);
+                return;
+            }
+        }
+		}
+
+
+        public override void OutOfCombatPulse()
+       
+	   {
+			if (!API.PlayerIsMounted && IsNotEating)
+			{
+
+            if (API.CanCast(VampiricEmbrace) && !API.PlayerHasBuff(VampiricEmbrace))
+            {
+                API.CastSpell(VampiricEmbrace);
+                return;
+            }
+            if (API.CanCast(InnerFire) && !API.PlayerHasBuff(InnerFire))
+            {
+                API.CastSpell(InnerFire);
+                return;
+            }
+			if (API.CanCast(PowerWordFortitude) 
+						&& !API.PlayerHasBuff(PowerWordFortitude)
+							&& !API.PlayerHasBuff(POPowerWordFortitude)
+								&& (!API.PlayerIsInRaid || API.PlayerIsInGroup))
+                    {
+                        API.CastSpell(PowerWordFortitude);
+                        return;
+                    }
+					if (API.CanCast(DivineSpirit) 
+						&& !API.PlayerHasBuff(DivineSpirit)
+							&& !API.PlayerHasBuff(PODivineSpirit)
+								&& (!API.PlayerIsInRaid || API.PlayerIsInGroup))
+                    {
+                        API.CastSpell(DivineSpirit);
+                        return;
+                    }
+					if (API.CanCast(ShadowProt) 
+						&& !API.PlayerHasBuff(ShadowProt)
+							&& !API.PlayerHasBuff(POShadowProt)
+								&& (!API.PlayerIsInRaid || API.PlayerIsInGroup))
+                    {
+                        API.CastSpell(ShadowProt);
+                        return;
+                    }
+					if (API.CanCast(ShadowForm) && !API.PlayerHasBuff(ShadowForm))
+					{
+						API.CastSpell(ShadowForm);
+						return;
+					}
+			}
+        }
+
+        public override void Pulse()
+        {
+
+
+        }
+
+    }
+}
